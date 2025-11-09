@@ -1,4 +1,4 @@
-# Payment Gateway Reconciliation System
+#  Payment Gateway Financial Sheets Automation
 
 Automated data reconciliation system for payment gateway transactions using Google Apps Script.
 
