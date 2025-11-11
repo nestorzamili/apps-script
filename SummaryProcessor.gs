@@ -105,7 +105,6 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
         settlementDate: settlementDate,
         amountPG: 0,
         kiraAmount: 0,
-        amountRHB: 0,
       });
     }
 
@@ -117,10 +116,6 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
 
     if (typeof kiraAmount === 'number' && kiraAmount > 0) {
       summary.kiraAmount += kiraAmount;
-    }
-
-    if (typeof bankAmount === 'number' && bankAmount > 0) {
-      summary.amountRHB += bankAmount;
     }
   });
 
@@ -145,19 +140,15 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
     const settlementAmount = s.amountPG - fees;
 
     const pgKiraDailyVariance = s.amountPG - s.kiraAmount;
-    const pgRhbDailyVariance = s.amountPG - s.amountRHB;
 
     let pgKiraCumulativeVariance = pgKiraDailyVariance;
-    let pgRhbCumulativeVariance = pgRhbDailyVariance;
 
     if (index > 0) {
       const prev = summaryArray[index - 1];
       pgKiraCumulativeVariance = (prev.pgKiraCumulativeVariance || 0) + pgKiraDailyVariance;
-      pgRhbCumulativeVariance = (prev.pgRhbCumulativeVariance || 0) + pgRhbDailyVariance;
     }
 
     summaryArray[index].pgKiraCumulativeVariance = pgKiraCumulativeVariance;
-    summaryArray[index].pgRhbCumulativeVariance = pgRhbCumulativeVariance;
 
     return [
       s.pgMerchant,
@@ -171,9 +162,9 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
       s.kiraAmount || 0,
       pgKiraDailyVariance,
       pgKiraCumulativeVariance,
-      s.amountRHB || 0,
-      pgRhbDailyVariance,
-      pgRhbCumulativeVariance,
+      '',
+      '',
+      '',
       '',
     ];
   });

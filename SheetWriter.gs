@@ -80,22 +80,133 @@ function writeToSummarySheet(sheet, newData, batchSize) {
     'Remarks',
   ];
 
-  Logger.log('Writing summary: ' + newData.length + ' rows');
+  Logger.log('Comparing with existing data...');
   
-  sheet.clear();
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  const existingData = sheet.getDataRange().getValues();
+  const hasExistingData = existingData.length > 1;
   
-  for (let i = 0; i < newData.length; i += batchSize) {
-    const batch = newData.slice(i, Math.min(i + batchSize, newData.length));
-    const startRow = i + 2;
-    const progress = ((i + batch.length) / newData.length * 100).toFixed(1);
+  if (!hasExistingData) {
+    Logger.log('No existing data - writing all new data: ' + newData.length + ' rows');
+    sheet.clear();
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     
-    Logger.log('Writing summary batch: rows ' + (i + 1) + '-' + (i + batch.length) + ' (' + progress + '%)');
+    const dataToWrite = newData.map(row => {
+      const newRow = row.slice();
+      newRow[11] = '';
+      newRow[12] = '';
+      newRow[13] = '';
+      newRow[14] = '';
+      return newRow;
+    });
     
-    writeBatchWithRetry(sheet, startRow, batch, headers.length);
+    for (let i = 0; i < dataToWrite.length; i += batchSize) {
+      const batch = dataToWrite.slice(i, Math.min(i + batchSize, dataToWrite.length));
+      const startRow = i + 2;
+      const progress = ((i + batch.length) / dataToWrite.length * 100).toFixed(1);
+      
+      Logger.log('Writing batch: rows ' + (i + 1) + '-' + (i + batch.length) + ' (' + progress + '%)');
+      
+      const currentMaxRows = sheet.getMaxRows();
+      const neededRows = startRow + batch.length - 1;
+      if (neededRows > currentMaxRows) {
+        sheet.insertRowsAfter(currentMaxRows, neededRows - currentMaxRows);
+      }
+      
+      sheet.getRange(startRow, 1, batch.length, 11).setValues(batch.map(row => row.slice(0, 11)));
+      
+      SpreadsheetApp.flush();
+    }
+    
+    Logger.log('Summary write completed: ' + dataToWrite.length + ' rows (columns L-O left empty for manual input)');
+    return;
   }
   
-  Logger.log('Summary write completed: ' + newData.length + ' rows');
+  const existingMap = new Map();
+  for (let i = 1; i < existingData.length; i++) {
+    const row = existingData[i];
+    const normalizedDate = extractDate(row[2]);
+    const key = row[0] + '|' + row[1] + '|' + normalizedDate;
+    existingMap.set(key, {
+      rowIndex: i,
+      amountRHB: row[11],
+      dailyVariance: row[12],
+      cumulativeVariance: row[13],
+      remarks: row[14]
+    });
+  }
+  
+  Logger.log('Found existing data: ' + existingMap.size + ' rows');
+  
+  const updates = [];
+  const appendRows = [];
+  
+  newData.forEach((row) => {
+    const normalizedDate = extractDate(row[2]);
+    const key = row[0] + '|' + row[1] + '|' + normalizedDate;
+    
+    if (existingMap.has(key)) {
+      const existing = existingMap.get(key);
+      
+      row[11] = (existing.amountRHB !== null && existing.amountRHB !== undefined && existing.amountRHB !== '') ? existing.amountRHB : '';
+      row[12] = (existing.dailyVariance !== null && existing.dailyVariance !== undefined && existing.dailyVariance !== '') ? existing.dailyVariance : '';
+      row[13] = (existing.cumulativeVariance !== null && existing.cumulativeVariance !== undefined && existing.cumulativeVariance !== '') ? existing.cumulativeVariance : '';
+      row[14] = (existing.remarks !== null && existing.remarks !== undefined && existing.remarks !== '') ? existing.remarks : '';
+      
+      updates.push({
+        rowIndex: existing.rowIndex + 1,
+        data: row
+      });
+    } else {
+      appendRows.push(row);
+    }
+  });
+  
+  Logger.log('Updates: ' + updates.length + ' rows, New: ' + appendRows.length + ' rows');
+  
+  for (let i = 0; i < updates.length; i += batchSize) {
+    const batch = updates.slice(i, Math.min(i + batchSize, updates.length));
+    const progress = ((i + batch.length) / updates.length * 100).toFixed(1);
+    
+    Logger.log('Updating batch: ' + (i + 1) + '-' + (i + batch.length) + ' (' + progress + '%)');
+    
+    batch.forEach((update) => {
+      sheet.getRange(update.rowIndex, 1, 1, headers.length).setValues([update.data]);
+    });
+    
+    SpreadsheetApp.flush();
+  }
+  
+  if (appendRows.length > 0) {
+    const startRow = existingData.length + 1;
+    
+    const currentMaxRows = sheet.getMaxRows();
+    const neededRows = startRow + appendRows.length - 1;
+    if (neededRows > currentMaxRows) {
+      sheet.insertRowsAfter(currentMaxRows, neededRows - currentMaxRows);
+    }
+    
+    Logger.log('Appending new rows: ' + appendRows.length + ' (columns L-O left empty for manual input)');
+    
+    for (let i = 0; i < appendRows.length; i += batchSize) {
+      const batch = appendRows.slice(i, Math.min(i + batchSize, appendRows.length));
+      const batchStartRow = startRow + i;
+      const progress = ((i + batch.length) / appendRows.length * 100).toFixed(1);
+      
+      Logger.log('Appending batch: rows ' + (i + 1) + '-' + (i + batch.length) + ' (' + progress + '%)');
+      
+      const currentBatchMaxRows = sheet.getMaxRows();
+      const neededBatchRows = batchStartRow + batch.length - 1;
+      if (neededBatchRows > currentBatchMaxRows) {
+        sheet.insertRowsAfter(currentBatchMaxRows, neededBatchRows - currentBatchMaxRows);
+      }
+      
+      sheet.getRange(batchStartRow, 1, batch.length, 11).setValues(batch.map(row => row.slice(0, 11)));
+      
+      SpreadsheetApp.flush();
+    }
+  }
+  
+  Logger.log('Summary write completed: ' + updates.length + ' updated, ' + appendRows.length + ' appended');
 }
 
 function applyConditionalFormatting(sheet, dataLength) {
