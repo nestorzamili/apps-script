@@ -66,12 +66,13 @@ function writeToSummarySheet(sheet, newData, batchSize) {
     'PG Merchant',
     'Channel',
     'Transaction Date',
+    'Kira Amount',
+    'PG Date',
+    'Amount PG',
     'Settlement Rule',
     'Settlement Date',
-    'Amount PG',
     'Fees',
     'Settlement Amount',
-    'Kira Amount',
     'PG KIRA Daily Variance',
     'PG KIRA Cumulative Variance',
     'Amount RHB',
@@ -92,10 +93,10 @@ function writeToSummarySheet(sheet, newData, batchSize) {
     
     const dataToWrite = newData.map(row => {
       const newRow = row.slice();
-      newRow[11] = '';
-      newRow[12] = '';
       newRow[13] = '';
       newRow[14] = '';
+      newRow[15] = '';
+      newRow[16] = '';
       return newRow;
     });
     
@@ -112,7 +113,7 @@ function writeToSummarySheet(sheet, newData, batchSize) {
         sheet.insertRowsAfter(currentMaxRows, neededRows - currentMaxRows);
       }
       
-      sheet.getRange(startRow, 1, batch.length, 11).setValues(batch.map(row => row.slice(0, 11)));
+      sheet.getRange(startRow, 1, batch.length, 13).setValues(batch.map(row => row.slice(0, 13)));
       
       SpreadsheetApp.flush();
     }
@@ -147,10 +148,10 @@ function writeToSummarySheet(sheet, newData, batchSize) {
     if (existingMap.has(key)) {
       const existing = existingMap.get(key);
       
-      row[11] = (existing.amountRHB !== null && existing.amountRHB !== undefined && existing.amountRHB !== '') ? existing.amountRHB : '';
-      row[12] = (existing.dailyVariance !== null && existing.dailyVariance !== undefined && existing.dailyVariance !== '') ? existing.dailyVariance : '';
-      row[13] = (existing.cumulativeVariance !== null && existing.cumulativeVariance !== undefined && existing.cumulativeVariance !== '') ? existing.cumulativeVariance : '';
-      row[14] = (existing.remarks !== null && existing.remarks !== undefined && existing.remarks !== '') ? existing.remarks : '';
+      row[13] = (existing.amountRHB !== null && existing.amountRHB !== undefined && existing.amountRHB !== '') ? existing.amountRHB : '';
+      row[14] = (existing.dailyVariance !== null && existing.dailyVariance !== undefined && existing.dailyVariance !== '') ? existing.dailyVariance : '';
+      row[15] = (existing.cumulativeVariance !== null && existing.cumulativeVariance !== undefined && existing.cumulativeVariance !== '') ? existing.cumulativeVariance : '';
+      row[16] = (existing.remarks !== null && existing.remarks !== undefined && existing.remarks !== '') ? existing.remarks : '';
       
       updates.push({
         rowIndex: existing.rowIndex + 1,

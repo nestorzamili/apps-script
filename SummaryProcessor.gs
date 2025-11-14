@@ -81,6 +81,7 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
     const kiraAmount = row[5];
     const pgMerchant = row[6];
     const pgChannel = row[7];
+    const pgTransactionDate = row[8];
     const pgAmount = row[9];
     const bankAmount = row[13];
 
@@ -103,6 +104,7 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
         transactionDate: transactionDate,
         settlementRule: settlementRule,
         settlementDate: settlementDate,
+        pgTransactionDate: pgTransactionDate === 'No Data' ? 'No Data' : extractDate(pgTransactionDate) || 'No Data',
         amountPG: 0,
         kiraAmount: 0,
       });
@@ -154,12 +156,13 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
       s.pgMerchant,
       s.channel,
       s.transactionDate,
+      s.kiraAmount || 0,
+      s.pgTransactionDate || 'No Data',
+      s.amountPG === 0 ? 'No Data' : (s.amountPG || 0),
       s.settlementRule,
       s.settlementDate,
-      s.amountPG || 0,
       fees,
       settlementAmount,
-      s.kiraAmount || 0,
       pgKiraDailyVariance,
       pgKiraCumulativeVariance,
       '',
