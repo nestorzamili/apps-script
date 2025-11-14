@@ -73,8 +73,7 @@ function runSummaryProcessor() {
 }
 
 function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
-  const kiraMap = new Map();
-  const pgMap = new Map();
+  const summaryMap = new Map();
 
   mergedData.forEach((row) => {
     const createdOn = row[0];
@@ -90,20 +89,33 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
     const transactionDate = extractDate(createdOn);
     if (!transactionDate) return;
 
-    const kiraKey = pgMerchant + '|' + pgChannel + '|' + transactionDate;
+    const summaryKey = pgMerchant + '|' + pgChannel + '|' + transactionDate;
     
-    if (!kiraMap.has(kiraKey)) {
-      kiraMap.set(kiraKey, 0);
+    if (!summaryMap.has(summaryKey)) {
+      const settlementRule = getSettlementRule(merchant, pgChannel, settlementRuleMap);
+      
+      summaryMap.set(summaryKey, {
+        pgMerchant: pgMerchant,
+        channel: pgChannel,
+        transactionDate: transactionDate,
+        kiraAmount: 0,
+        pgDate: 'No Data',
+        amountPG: 0,
+        settlementRule: settlementRule,
+        settlementDate: '',
+      });
     }
 
+    const summary = summaryMap.get(summaryKey);
     if (typeof kiraAmount === 'number' && kiraAmount > 0) {
-      kiraMap.set(kiraKey, kiraMap.get(kiraKey) + kiraAmount);
+      summary.kiraAmount += kiraAmount;
     }
   });
 
+  const pgByDate = new Map();
+  
   mergedData.forEach((row) => {
     const createdOn = row[0];
-    const merchant = row[1];
     const pgMerchant = row[6];
     const pgChannel = row[7];
     const pgTransactionDate = row[8];
@@ -117,95 +129,51 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
     if (!transactionDate) return;
 
     const pgDate = pgTransactionDate === 'No Data' ? 'No Data' : extractDate(pgTransactionDate) || 'No Data';
+    
     const pgKey = pgMerchant + '|' + pgChannel + '|' + pgDate;
-
-    if (!pgMap.has(pgKey)) {
-      const settlementRule = getSettlementRule(merchant, pgChannel, settlementRuleMap);
-      const settlementDate = calculateSettlementDate(pgDate === 'No Data' ? transactionDate : pgDate, settlementRule, holidaySet);
-      
-      pgMap.set(pgKey, {
-        pgMerchant: pgMerchant,
-        channel: pgChannel,
+    
+    if (!pgByDate.has(pgKey)) {
+      pgByDate.set(pgKey, {
         pgDate: pgDate,
-        settlementRule: settlementRule,
-        settlementDate: settlementDate,
         amountPG: 0,
         transactionDates: new Set(),
       });
     }
 
-    const summary = pgMap.get(pgKey);
-    summary.transactionDates.add(transactionDate);
-
+    const pgData = pgByDate.get(pgKey);
+    pgData.transactionDates.add(transactionDate);
+    
     if (typeof pgAmount === 'number' && pgAmount > 0) {
-      summary.amountPG += pgAmount;
+      pgData.amountPG += pgAmount;
     }
   });
 
-  const summaryMap = new Map();
-  
-  pgMap.forEach((pgSummary, pgKey) => {
+  pgByDate.forEach((pgData, pgKey) => {
     const parts = pgKey.split('|');
     const pgMerchant = parts[0];
     const pgChannel = parts[1];
     const pgDate = parts[2];
     
-    pgSummary.transactionDates.forEach((transactionDate) => {
-      const kiraKey = pgMerchant + '|' + pgChannel + '|' + transactionDate;
-      const kiraAmount = kiraMap.get(kiraKey) || 0;
+    pgData.transactionDates.forEach((transactionDate) => {
+      const summaryKey = pgMerchant + '|' + pgChannel + '|' + transactionDate;
       
-      const summaryKey = pgMerchant + '|' + pgChannel + '|' + transactionDate + '|' + pgDate;
-      summaryMap.set(summaryKey, {
-        pgMerchant: pgMerchant,
-        channel: pgChannel,
-        transactionDate: transactionDate,
-        pgDate: pgDate,
-        settlementRule: pgSummary.settlementRule,
-        settlementDate: pgSummary.settlementDate,
-        amountPG: pgSummary.amountPG,
-        kiraAmount: kiraAmount,
-      });
-    });
-  });
-  
-  kiraMap.forEach((kiraAmount, kiraKey) => {
-    const parts = kiraKey.split('|');
-    const pgMerchant = parts[0];
-    const pgChannel = parts[1];
-    const transactionDate = parts[2];
-    
-    let hasAnyPGData = false;
-    for (const key of summaryMap.keys()) {
-      if (key.startsWith(pgMerchant + '|' + pgChannel + '|' + transactionDate + '|')) {
-        hasAnyPGData = true;
-        break;
-      }
-    }
-    
-    if (!hasAnyPGData) {
-      let merchant = '';
-      for (const row of mergedData) {
-        if (row[6] === pgMerchant && row[7] === pgChannel) {
-          merchant = row[1];
-          break;
+      if (summaryMap.has(summaryKey)) {
+        const summary = summaryMap.get(summaryKey);
+        
+        if (pgDate === transactionDate) {
+          summary.pgDate = pgDate;
+          summary.amountPG = pgData.amountPG;
+          summary.settlementDate = calculateSettlementDate(pgDate, summary.settlementRule, holidaySet);
+        } else if (summary.pgDate === 'No Data' && pgDate !== 'No Data') {
+          summary.pgDate = pgDate;
+          summary.amountPG = pgData.amountPG;
+          summary.settlementDate = calculateSettlementDate(pgDate, summary.settlementRule, holidaySet);
+        } else if (summary.pgDate === 'No Data' && pgDate === 'No Data') {
+          summary.amountPG += pgData.amountPG;
+          summary.settlementDate = calculateSettlementDate(transactionDate, summary.settlementRule, holidaySet);
         }
       }
-      
-      const settlementRule = getSettlementRule(merchant, pgChannel, settlementRuleMap);
-      const settlementDate = calculateSettlementDate(transactionDate, settlementRule, holidaySet);
-      
-      const noDataKey = pgMerchant + '|' + pgChannel + '|' + transactionDate + '|No Data';
-      summaryMap.set(noDataKey, {
-        pgMerchant: pgMerchant,
-        channel: pgChannel,
-        transactionDate: transactionDate,
-        pgDate: 'No Data',
-        settlementRule: settlementRule,
-        settlementDate: settlementDate,
-        amountPG: 0,
-        kiraAmount: kiraAmount,
-      });
-    }
+    });
   });
 
   const summaryArray = Array.from(summaryMap.values());
