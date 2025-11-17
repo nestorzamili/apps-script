@@ -9,10 +9,10 @@ function onEdit(e) {
 
   if (sheetName === CONFIG.SHEET_NAMES.SUMMARY) {
     handleSummaryEdit(sheet, row, col);
-    // } else if (sheetName === "Merchants Balance & Settlement Ledger") {
-    //   handleMerchantLedgerEdit(sheet, range, row, col);
-    // } else if (sheetName === "Agents Balance & Settlement Ledger") {
-    //   handleAgentLedgerEdit(sheet, range, row, col);
+  } else if (sheetName === 'Merchants Balance & Settlement Ledger') {
+    handleMerchantLedgerEdit(sheet, range, row, col);
+  } else if (sheetName === 'Agents Balance & Settlement Ledger') {
+    handleAgentLedgerEdit(sheet, range, row, col);
   }
 }
 
@@ -34,7 +34,7 @@ function handleMerchantLedgerEdit(sheet, range, row, col) {
 
 function handleAgentLedgerEdit(sheet, range, row, col) {
   if (range.getA1Notation() === 'B1' || range.getA1Notation() === 'B2') {
-    importagent();
+    importAgent();
     return;
   }
 
