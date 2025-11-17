@@ -120,15 +120,24 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
     const pgChannel = row[7];
     const pgTransactionDate = row[8];
     const pgAmount = row[9];
+    const remarks = row[14];
 
     if (pgMerchant === 'No Data' || pgChannel === 'No Data') {
       return;
     }
 
-    const transactionDate = extractDate(createdOn);
-    if (!transactionDate) return;
+    if (remarks && String(remarks).toLowerCase().includes('bank only')) {
+      return;
+    }
 
     const pgDate = pgTransactionDate === 'No Data' ? 'No Data' : extractDate(pgTransactionDate) || 'No Data';
+    
+    if (pgDate === 'No Data') return;
+
+    let transactionDate = extractDate(createdOn);
+    if (!transactionDate) {
+      transactionDate = pgDate;
+    }
     
     const pgKey = pgMerchant + '|' + pgChannel + '|' + pgDate;
     
@@ -157,7 +166,21 @@ function generateSummary(mergedData, settlementRuleMap, holidaySet, feeMap) {
     pgData.transactionDates.forEach((transactionDate) => {
       const summaryKey = pgMerchant + '|' + pgChannel + '|' + transactionDate;
       
-      if (summaryMap.has(summaryKey)) {
+      if (!summaryMap.has(summaryKey)) {
+        const settlementRule = getSettlementRule('', pgChannel, settlementRuleMap);
+        const settlementDate = calculateSettlementDate(pgDate, settlementRule, holidaySet);
+        
+        summaryMap.set(summaryKey, {
+          pgMerchant: pgMerchant,
+          channel: pgChannel,
+          transactionDate: transactionDate,
+          kiraAmount: 0,
+          pgDate: pgDate,
+          amountPG: pgData.amountPG,
+          settlementRule: settlementRule,
+          settlementDate: settlementDate,
+        });
+      } else {
         const summary = summaryMap.get(summaryKey);
         
         if (pgDate === transactionDate) {
