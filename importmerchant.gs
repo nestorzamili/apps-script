@@ -197,14 +197,14 @@ function importmerchant() {
     const key = `${merchant}@${monthNum}@${dateStr}`;
     const manual = storeMap.get(key) || {};
 
-    const withdrawCharges = parseNumber(manual.withdraw) * withdrawRate;
+    const fund = parseNumber(manual.fund);
+    const charges = parseNumber(manual.charges);
+    const withdraw = parseNumber(manual.withdraw);
+    const withdrawCharges = withdraw * withdrawRate;
+
     const closing =
-      prevBalance +
-      availTotal -
-      (parseNumber(manual.fund) +
-        parseNumber(manual.charges) +
-        parseNumber(manual.withdraw) +
-        withdrawCharges);
+      prevBalance + availTotal - (fund + charges + withdraw + withdrawCharges);
+
     prevBalance = closing;
 
     results.push([
@@ -220,9 +220,9 @@ function importmerchant() {
       s.fpx,
       s.ewallet,
       availTotal,
-      parseNumber(manual.fund),
-      parseNumber(manual.charges),
-      parseNumber(manual.withdraw),
+      fund,
+      charges,
+      withdraw,
       withdrawCharges,
       closing,
       formatDate(new Date(), DATETIME_FORMAT),
